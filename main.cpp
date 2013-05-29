@@ -51,17 +51,17 @@ struct MyStringHash {
     ane_default_hash<Order> h;
 
     // from: http://www.cse.yorku.ca/~oz/hash.html
-    /* static size_t string_hash(const std::string &key) const {
+    static size_t string_hash(const std::string &key) {
         size_t s = 5381;
         const size_t len = key.size();
         const char *ptr = key.c_str();
         for (size_t i = 0; i < len; ++i, ++ptr)
             s = ((s << 5) + s) + (size_t)*ptr;
         return s;
-    } */
+    }
 
     size_t operator()(size_t level, const std::string &key) const {
-        return 0;
+        return h(level, string_hash(key));
     }
 };
 
