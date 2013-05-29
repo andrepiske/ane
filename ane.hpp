@@ -35,7 +35,7 @@
 #ifndef __ARVORE_NE_H__
 #define __ARVORE_NE_H__
 
-template<class KeyType, class DataType, int Order, class HashFunction>
+template<class KeyType, class DataType, size_t Order, class HashFunction>
 class ane
 {
 public:
@@ -57,9 +57,16 @@ public:
         DataType data;
         ane::NodePtr children[Order];
 
+        bool is_leaf() const {
+            for (size_t i = 0; i < Order; ++i)
+                if (children[i])
+                    return false;
+            return true;
+        }
+
     private:
         void _init() {
-            for (int i = 0; i < Order; ++i)
+            for (size_t i = 0; i < Order; ++i)
                 children[i] = NULL;
         }
     };
@@ -67,6 +74,32 @@ public:
     ane() {
         m_root = NULL;
     }
+
+protected:
+    struct node_reference {
+        NodePtr parent_node;
+        size_t hash_value;
+
+        node_reference() : parent_node(NULL), hash_value(0) {
+        }
+
+        node_reference(NodePtr parent, size_t hash)
+         : parent_node(parent), hash_value(hash) {
+        }
+
+        NodePtr node() const {
+            return parent_node->children[hash_value];
+        }
+
+        bool valid_parent() const {
+            return (bool)parent_node;
+        }
+
+        bool valid_node() const {
+            return parent_node ?
+                (bool)parent_node->children[hash_value] : false;
+        }
+    };
 
 public:
     typedef ane<KeyType, DataType, Order, HashFunction> ThisType;
@@ -81,9 +114,9 @@ public:
             return true;
         }
         NodePtr _node = m_root;
-        for (int level = 0;; ++level) {
+        for (size_t level = 0;; ++level) {
             const HashFunction hash;
-            const int hash_val = hash(level, key);
+            const size_t hash_val = hash(level, key);
             NodePtr *c = &_node->children[hash_val];
             if (!*c) {
                 *c = new node(key, data);
@@ -100,22 +133,33 @@ public:
         return false;
     }
 
+    // Remove the node associated with the given key.
+    // Returns true if the node was removed, or false if no such node exist.
+    bool remove(const KeyType &key) {
+        node_reference nr;
+        if (!_find(key, nr))
+            return false;
+        NodePtr node = nr.node();
+        if (node->is_leaf()) {
+            nr.parent_node->children[nr.hash_value] = NULL;
+            delete node;
+        } else {
+            size_t d_level = 0;
+            node_reference d_node;
+            _find_deepest(nr, key, 0, d_level, d_node);
+            node->data = d_node.node()->data;
+            node->key = d_node.node()->key;
+            delete d_node.parent_node->children[d_node.hash_value];
+            d_node.parent_node->children[d_node.hash_value] = NULL;
+        }
+        return true;
+        
+    }
+
     // Finds the node for the given key. Returns null if no such node exist.
     NodePtr find(const KeyType &key) const {
-        if (!m_root)
-            return NULL;
-        NodePtr _node = m_root;
-        for (int level = 0;; ++level) {
-            const HashFunction hash;
-            const int hash_val = hash(level, key);
-            NodePtr c;
-            if (!(c = _node->children[hash_val]))
-                return NULL;
-            if (c->key == key)
-                return c;
-            _node = c;
-        }
-        return NULL;
+        node_reference nr;
+        return _find(key, nr) ? (nr.valid_parent() ? nr.node() : m_root) : NULL;
     }
 
     // Tree traversal.
@@ -141,10 +185,49 @@ public:
 protected:
     NodePtr m_root;
 
+    void _find_deepest(node_reference &base, const KeyType &key,
+        size_t level, size_t &d_level, node_reference &d_node)
+    {
+        bool has_child = false;
+        for (size_t i = 0; i < Order; ++i) {
+            node_reference child(base.node(), i);
+            if (!child.valid_node())
+                continue;
+            _find_deepest(child, key, level+1, d_level, d_node);
+            has_child = true;
+        }
+        if (!has_child && level > d_level) {
+            d_node = base;
+            d_level = level;
+        }
+    }
+
+    bool _find(const KeyType &key, node_reference &nref) const {
+        if (!m_root)
+            return false;
+        NodePtr _node = m_root;
+        if (_node->key == key)
+            return true;
+        for (size_t level = 0;; ++level) {
+            const HashFunction hash;
+            const size_t hash_val = hash(level, key);
+            NodePtr c;
+            if (!(c = _node->children[hash_val]))
+                return false;
+            if (c->key == key) {
+                nref = node_reference(_node, hash_val);
+                return c;
+            }
+            _node = c;
+        }
+        return false;
+    }
+
+
     template<class T>
     bool _traverse(T &t, NodePtr n) const {
         t.visit(n);
-        for (int i = 0; i < Order; ++i)
+        for (size_t i = 0; i < Order; ++i)
             if (n->children[i])
                 if (!_traverse(t, n->children[i]))
                     return false;

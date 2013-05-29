@@ -38,11 +38,11 @@
 #include "ane.hpp"
 
 // Funcao de hash segundo o artigo 
-template<int Order>
+template<size_t Order>
 struct MyAneHash {
-    int operator()(int level, int key) const {
-        int r = 0;
-        for (int i = 0; i <= key; ++i) {
+    size_t operator()(size_t level, size_t key) const {
+        size_t r = 0;
+        for (size_t i = 0; i <= key; ++i) {
             r = (key + i) % (Order + level + i);
             if (r < Order)
                 break;
@@ -71,13 +71,13 @@ struct Tv {
 /* Expected output:
 -- OUTPUT BEGIN --
 Visit node 'Vier'
-Visit node 'Neuntausend'
 Visit node 'Two dreihundert'
-Visit node 'Ein'
+Visit node 'Klein bottle'
+Node 1 found: Klein bottle
 Node 15 not found
 Node 2300 found: Two dreihundert
-Node 1 found: Ein
-Node 9000 found: Neuntausend
+Node 4 found: Vier
+Node 9000 not found
 -- OUTPUT END --
 */
 int main(int argc, char *argv[])
@@ -90,9 +90,13 @@ int main(int argc, char *argv[])
     u.put(2300, "Nein!");
     u.put_or_replace(2300, "Two dreihundert");
 
+    u.remove(1);
+    u.remove(9000);
+    u.put(1, "Klein bottle");
+
     u.traverse<const Tv>(Tv());
 
-    const int find_keys[] = { 15, 2300, 1, 9000 };
+    const int find_keys[] = { 1, 15, 2300, 4, 9000 };
     for (size_t i = 0; i < sizeof(find_keys)/sizeof(find_keys[0]); ++i) {
         MyAne::NodePtr node = u.find(find_keys[i]);
         printf(node ? "Node %d found: %s\n" : "Node %d not found\n",
