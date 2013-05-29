@@ -35,7 +35,22 @@
 #ifndef __ARVORE_NE_H__
 #define __ARVORE_NE_H__
 
-template<class KeyType, class DataType, size_t Order, class HashFunction>
+// Funcao de hash segundo o artigo 
+template<size_t Order>
+struct ane_default_hash {
+    size_t operator()(size_t level, size_t key) const {
+        size_t r = 0;
+        for (size_t i = 0; i <= key; ++i) {
+            r = (key + i) % (Order + level + i);
+            if (r < Order)
+                break;
+        }
+        return r;
+    }
+};
+
+template<class KeyType, class DataType, size_t Order,
+    class HashFunction=ane_default_hash<Order> >
 class ane
 {
 public:

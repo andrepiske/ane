@@ -37,20 +37,6 @@
 #include <string>
 #include "ane.hpp"
 
-// Funcao de hash segundo o artigo 
-template<size_t Order>
-struct MyAneHash {
-    size_t operator()(size_t level, size_t key) const {
-        size_t r = 0;
-        for (size_t i = 0; i <= key; ++i) {
-            r = (key + i) % (Order + level + i);
-            if (r < Order)
-                break;
-        }
-        return r;
-    }
-};
-
 /* Arvore ANE:
  ane<
     tipo da chave,
@@ -59,10 +45,38 @@ struct MyAneHash {
     funcao de hash
     >
 */
-typedef ane<int, std::string, 2, MyAneHash<2> > MyAne;
+
+template<size_t Order>
+struct MyStringHash {
+    ane_default_hash<Order> h;
+
+    // from: http://www.cse.yorku.ca/~oz/hash.html
+    /* static size_t string_hash(const std::string &key) const {
+        size_t s = 5381;
+        const size_t len = key.size();
+        const char *ptr = key.c_str();
+        for (size_t i = 0; i < len; ++i, ++ptr)
+            s = ((s << 5) + s) + (size_t)*ptr;
+        return s;
+    } */
+
+    size_t operator()(size_t level, const std::string &key) const {
+        return 0;
+    }
+};
+
+typedef ane<int, std::string, 2> MyAne;
+typedef ane<std::string, std::string, 2, MyStringHash<2> > MyAneString;
 
 struct Tv {
     bool visit(MyAne::NodePtr node) const {
+        printf("Visit node '%s'\n", node->data.c_str());
+        return true;
+    }
+};
+
+struct TvString {
+    bool visit(MyAneString::NodePtr node) const {
         printf("Visit node '%s'\n", node->data.c_str());
         return true;
     }
@@ -78,10 +92,28 @@ Node 15 not found
 Node 2300 found: Two dreihundert
 Node 4 found: Vier
 Node 9000 not found
+Visit node 'Vier'
+Visit node 'Two dreihundert'
+Visit node 'Klein bottle'
+Node um found: Klein bottle
+Node quinze not found
+Node dois mil e trezentos found: Two dreihundert
+Node quatro found: Vier
+Node nove mil not found
 -- OUTPUT END --
 */
+
+void string_ane();
+void int_ane();
+
 int main(int argc, char *argv[])
 {
+    int_ane();
+    string_ane();
+    return 0;
+}
+
+void int_ane() {
     MyAne u;
     u.put(4, "Vier");
     u.put(1, "Ein");
@@ -102,7 +134,28 @@ int main(int argc, char *argv[])
         printf(node ? "Node %d found: %s\n" : "Node %d not found\n",
             find_keys[i], node ? node->data.c_str() : NULL);
     }
+}
 
-    return 0;
+void string_ane() {
+    MyAneString u;
+    u.put("quatro", "Vier");
+    u.put("um", "Ein");
+    u.put("nove mil", "Neuntausend");
+    u.put("nove mil", "Das ist kaputt");
+    u.put("dois mil e trezentos", "Nein!");
+    u.put_or_replace("dois mil e trezentos", "Two dreihundert");
+
+    u.remove("um");
+    u.remove("nove mil");
+    u.put("um", "Klein bottle");
+
+    u.traverse<const TvString>(TvString());
+
+    const char* find_keys[] = { "um", "quinze", "dois mil e trezentos", "quatro", "nove mil" };
+    for (size_t i = 0; i < sizeof(find_keys)/sizeof(find_keys[0]); ++i) {
+        MyAneString::NodePtr node = u.find(find_keys[i]);
+        printf(node ? "Node %s found: %s\n" : "Node %s not found\n",
+            find_keys[i], node ? node->data.c_str() : NULL);
+    }
 }
 
